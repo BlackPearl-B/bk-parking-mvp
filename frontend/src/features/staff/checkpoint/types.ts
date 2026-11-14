@@ -45,3 +45,11 @@ export interface ShiftSummaryData {
   rejectedCount: number;
   exceptionCount: number;
 }
+
+export interface AlertItem {
+  id: string;
+  title: string;
+  time: string;
+  priorityNote: string;
+}
+

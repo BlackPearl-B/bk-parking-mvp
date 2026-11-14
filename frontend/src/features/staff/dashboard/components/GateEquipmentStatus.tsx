@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from '../../../../components/ui/Card';
 import { ProgressBar } from '../../../../components/ui/ProgressBar';
-import { Camera, CreditCard, Printer, Shield, CheckCircle2 } from 'lucide-react';
+import { Camera, CreditCard, Printer, Shield } from 'lucide-react';
 
 export const GateEquipmentStatus: React.FC = () => {
   return (

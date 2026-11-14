@@ -1,5 +1,5 @@
 import React from 'react';
-import { Car, Bike, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Car, Bike, Clock } from 'lucide-react';
 import { ParkingLotPublicInfo } from '../api/publicApi';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
 import { Badge } from '../../../components/ui/Badge';
