@@ -39,6 +39,9 @@ class VehicleServiceTest {
     @Mock
     private ParkingSessionRepository parkingSessionRepository;
 
+    @Mock
+    private vn.edu.hcmut.bkparking.repository.UserPackageRepository userPackageRepository;
+
     @InjectMocks
     private VehicleService vehicleService;
 
@@ -213,5 +216,66 @@ class VehicleServiceTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESOURCE_NOT_FOUND);
 
         verify(vehicleRepository, never()).save(any());
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. TẠO VÀ XÁC THỰC QR GẮN VỚI XE (ISSUE CRITERIA)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void getVehicleQr_Success_WhenApprovedAndOwner() {
+        Vehicle approvedVehicle = new Vehicle();
+        approvedVehicle.setId(10L);
+        approvedVehicle.setUser(mockUser);
+        approvedVehicle.setLicensePlate("59T2-119.88");
+        approvedVehicle.setVehicleType("MOTORBIKE");
+        approvedVehicle.setStatus("APPROVED");
+        approvedVehicle.setQrToken("BKQR-VEH10-59T211988-2026");
+
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(approvedVehicle));
+        when(userPackageRepository.findByUserIdAndStatus(1L, "ACTIVE"))
+                .thenReturn(List.of(new vn.edu.hcmut.bkparking.entity.UserPackage()));
+        when(parkingSessionRepository.findByVehicleIdAndStatus(10L, "ACTIVE"))
+                .thenReturn(Optional.empty());
+
+        vn.edu.hcmut.bkparking.dto.VehicleQrResponseDto qr = vehicleService.getVehicleQr(1L, "ROLE_USER", 10L);
+
+        assertThat(qr).isNotNull();
+        assertThat(qr.getVehicleId()).isEqualTo(10L);
+        assertThat(qr.getLicensePlate()).isEqualTo("59T2-119.88");
+        assertThat(qr.getQrToken()).isEqualTo("BKQR-VEH10-59T211988-2026");
+        assertThat(qr.isPackageEligible()).isTrue();
+        assertThat(qr.isCurrentlyInParkingLot()).isFalse();
+        assertThat(qr.getOwnerName()).isEqualTo("Nguyễn Văn An");
+        assertThat(qr.getOwnerCode()).isEqualTo("2311770");
+    }
+
+    @Test
+    void getVehicleQr_VehicleNotFound_ThrowsNotFoundException() {
+        when(vehicleRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> vehicleService.getVehicleQr(1L, "ROLE_USER", 999L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
+    @Test
+    void getVehicleQr_Forbidden_WhenNotOwnerAndNotStaffAdmin() {
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(mockPendingVehicle));
+
+        // User ID 2L tries to access vehicle belonging to User ID 1L
+        assertThatThrownBy(() -> vehicleService.getVehicleQr(2L, "ROLE_USER", 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+    }
+
+    @Test
+    void getVehicleQr_VehicleNotApproved_ThrowsVehicleNotApproved() {
+        // mockPendingVehicle has status PENDING
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(mockPendingVehicle));
+
+        assertThatThrownBy(() -> vehicleService.getVehicleQr(1L, "ROLE_USER", 10L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VEHICLE_NOT_APPROVED);
     }
 }

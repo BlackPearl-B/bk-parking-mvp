@@ -46,23 +46,35 @@ public class StaffAndSessionController {
     }
 
     public static class VerifyQrRequest {
-        @NotBlank(message = "Mã QR hoặc biển số không được để trống")
         private String qrOrPlate;
+        private String qrToken;
 
-        public String getQrOrPlate() { return qrOrPlate; }
+        public String getQrOrPlate() {
+            if (qrOrPlate != null && !qrOrPlate.isBlank()) return qrOrPlate;
+            return qrToken;
+        }
+
         public void setQrOrPlate(String qrOrPlate) { this.qrOrPlate = qrOrPlate; }
+        public String getQrToken() { return qrToken; }
+        public void setQrToken(String qrToken) { this.qrToken = qrToken; }
     }
 
     public static class CheckInRequest {
-        @NotBlank(message = "Mã QR hoặc biển số không được để trống")
         private String qrOrPlate;
+        private String qrToken;
         @NotNull(message = "Vui lòng chọn bãi đỗ xe (parkingLotId)")
         private Long parkingLotId;
         private String entryGate;
         private String note;
 
-        public String getQrOrPlate() { return qrOrPlate; }
+        public String getQrOrPlate() {
+            if (qrOrPlate != null && !qrOrPlate.isBlank()) return qrOrPlate;
+            return qrToken;
+        }
+
         public void setQrOrPlate(String qrOrPlate) { this.qrOrPlate = qrOrPlate; }
+        public String getQrToken() { return qrToken; }
+        public void setQrToken(String qrToken) { this.qrToken = qrToken; }
         public Long getParkingLotId() { return parkingLotId; }
         public void setParkingLotId(Long parkingLotId) { this.parkingLotId = parkingLotId; }
         public String getEntryGate() { return entryGate; }
@@ -72,13 +84,19 @@ public class StaffAndSessionController {
     }
 
     public static class CheckOutRequest {
-        @NotBlank(message = "Mã QR hoặc biển số không được để trống")
         private String qrOrPlate;
+        private String qrToken;
         private String exitGate;
         private String note;
 
-        public String getQrOrPlate() { return qrOrPlate; }
+        public String getQrOrPlate() {
+            if (qrOrPlate != null && !qrOrPlate.isBlank()) return qrOrPlate;
+            return qrToken;
+        }
+
         public void setQrOrPlate(String qrOrPlate) { this.qrOrPlate = qrOrPlate; }
+        public String getQrToken() { return qrToken; }
+        public void setQrToken(String qrToken) { this.qrToken = qrToken; }
         public String getExitGate() { return exitGate; }
         public void setExitGate(String exitGate) { this.exitGate = exitGate; }
         public String getNote() { return note; }
@@ -88,7 +106,11 @@ public class StaffAndSessionController {
     @PostMapping("/api/v1/staff/qr/verify")
     @Operation(summary = "[Staff] Quét / nhập mã QR hoặc biển số để kiểm tra hợp lệ trước khi cho VÀO/RA")
     public ApiResponse<Map<String, Object>> verifyQr(@Valid @RequestBody VerifyQrRequest request) {
-        Vehicle vehicle = resolveVehicle(request.getQrOrPlate());
+        String input = request.getQrOrPlate();
+        if (input == null || input.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Mã QR hoặc biển số không được để trống");
+        }
+        Vehicle vehicle = resolveVehicle(input);
         List<UserPackage> activePackages = userPackageRepository.findByUserIdAndStatus(vehicle.getUser().getId(), "ACTIVE");
         Optional<ParkingSession> activeSession = parkingSessionRepository.findByVehicleIdAndStatus(vehicle.getId(), "ACTIVE");
 
@@ -141,7 +163,11 @@ public class StaffAndSessionController {
     public ApiResponse<Map<String, Object>> checkIn(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CheckInRequest request) {
-        Vehicle vehicle = resolveVehicle(request.getQrOrPlate());
+        String input = request.getQrOrPlate();
+        if (input == null || input.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Mã QR hoặc biển số không được để trống");
+        }
+        Vehicle vehicle = resolveVehicle(input);
 
         if (!"APPROVED".equalsIgnoreCase(vehicle.getStatus())) {
             throw new BusinessException(ErrorCode.VEHICLE_NOT_APPROVED,
@@ -194,7 +220,11 @@ public class StaffAndSessionController {
     public ApiResponse<Map<String, Object>> checkOut(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CheckOutRequest request) {
-        Vehicle vehicle = resolveVehicle(request.getQrOrPlate());
+        String input = request.getQrOrPlate();
+        if (input == null || input.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Mã QR hoặc biển số không được để trống");
+        }
+        Vehicle vehicle = resolveVehicle(input);
 
         ParkingSession activeSession = parkingSessionRepository.findByVehicleIdAndStatus(vehicle.getId(), "ACTIVE")
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_ACTIVE_SESSION,

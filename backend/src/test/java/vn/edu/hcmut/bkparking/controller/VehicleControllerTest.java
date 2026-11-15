@@ -212,4 +212,114 @@ class VehicleControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
+
+    // -------------------------------------------------------------------------
+    // 3. TẠO VÀ XÁC THỰC QR GẮN VỚI XE (ISSUE CRITERIA)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void testGetVehicleQr_Success_WhenApprovedAndOwner() throws Exception {
+        String userToken = loginAndGetToken("sv.nguyen", "123456");
+
+        mockMvc.perform(get("/api/v1/vehicles/1/qr")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.vehicleId").value(1))
+                .andExpect(jsonPath("$.data.licensePlate").value("59X3-682.45"))
+                .andExpect(jsonPath("$.data.qrToken").value("BKQR-VEH1-59X368245-2026"))
+                .andExpect(jsonPath("$.data.ownerName").value("Nguyễn Văn An"))
+                .andExpect(jsonPath("$.data.ownerCode").value("2311770"))
+                .andExpect(jsonPath("$.data.packageEligible").value(true))
+                .andExpect(jsonPath("$.data.currentlyInParkingLot").value(false))
+                // Privacy check: Không lộ thông tin cá nhân nhạy cảm
+                .andExpect(jsonPath("$.data.registrationDocUrl").doesNotExist())
+                .andExpect(jsonPath("$.data.password").doesNotExist())
+                .andExpect(jsonPath("$.data.email").doesNotExist())
+                .andExpect(jsonPath("$.data.phone").doesNotExist());
+    }
+
+    @Test
+    void testGetVehicleQr_PendingVehicle_Returns400() throws Exception {
+        String userToken = loginAndGetToken("sv.nguyen", "123456");
+
+        mockMvc.perform(get("/api/v1/vehicles/2/qr")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("VEHICLE_NOT_APPROVED"));
+    }
+
+    @Test
+    void testGetVehicleQr_OtherUserVehicle_Returns403() throws Exception {
+        // User sv.tran tries to access vehicle 1 belonging to sv.nguyen
+        String otherUserToken = loginAndGetToken("sv.tran", "123456");
+
+        mockMvc.perform(get("/api/v1/vehicles/1/qr")
+                        .header("Authorization", "Bearer " + otherUserToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void testStaffVerifyQr_ApprovedVehicle_RecommendsCheckIn() throws Exception {
+        String staffToken = loginAndGetToken("staff.gate", "123456");
+
+        mockMvc.perform(post("/api/v1/staff/qr/verify")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"qrToken\":\"BKQR-VEH1-59X368245-2026\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.valid").value(true))
+                .andExpect(jsonPath("$.data.recommendedAction").value("CHECK_IN"))
+                .andExpect(jsonPath("$.data.packageEligible").value(true))
+                .andExpect(jsonPath("$.data.licensePlate").value("59X3-682.45"))
+                .andExpect(jsonPath("$.data.ownerName").value("Nguyễn Văn An"));
+    }
+
+    @Test
+    void testStaffVerifyQr_VehicleWithActiveSession_RecommendsCheckOut() throws Exception {
+        String staffToken = loginAndGetToken("staff.gate", "123456");
+
+        mockMvc.perform(post("/api/v1/staff/qr/verify")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"qrOrPlate\":\"BKQR-VEH3-60B845120-2026\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.valid").value(true))
+                .andExpect(jsonPath("$.data.recommendedAction").value("CHECK_OUT"))
+                .andExpect(jsonPath("$.data.licensePlate").value("60B8-451.20"));
+    }
+
+    @Test
+    void testStaffVerifyQr_RejectedVehicle_RecommendsDeny() throws Exception {
+        String staffToken = loginAndGetToken("staff.gate", "123456");
+
+        // Vehicle 4 is REJECTED
+        mockMvc.perform(post("/api/v1/staff/qr/verify")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"qrOrPlate\":\"72C1-990.12\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.valid").value(false))
+                .andExpect(jsonPath("$.data.recommendedAction").value("DENY"))
+                .andExpect(jsonPath("$.data.statusMessage").value("Phương tiện chưa được duyệt (Trạng thái: REJECTED)"));
+    }
+
+    @Test
+    void testStaffVerifyQr_InvalidQrOrPlate_Returns400() throws Exception {
+        String staffToken = loginAndGetToken("staff.gate", "123456");
+
+        mockMvc.perform(post("/api/v1/staff/qr/verify")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"qrOrPlate\":\"BKQR-NON-EXISTENT\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("INVALID_QR_TOKEN"));
+    }
 }

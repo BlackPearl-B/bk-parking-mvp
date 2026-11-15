@@ -5,14 +5,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.hcmut.bkparking.common.exception.BusinessException;
 import vn.edu.hcmut.bkparking.common.exception.ErrorCode;
-import vn.edu.hcmut.bkparking.dto.AdminVehicleResponseDto;
-import vn.edu.hcmut.bkparking.dto.CreateVehicleRequest;
-import vn.edu.hcmut.bkparking.dto.RejectVehicleRequest;
-import vn.edu.hcmut.bkparking.dto.UserVehicleResponseDto;
+import vn.edu.hcmut.bkparking.dto.*;
 import vn.edu.hcmut.bkparking.entity.ParkingSession;
 import vn.edu.hcmut.bkparking.entity.User;
+import vn.edu.hcmut.bkparking.entity.UserPackage;
 import vn.edu.hcmut.bkparking.entity.Vehicle;
 import vn.edu.hcmut.bkparking.repository.ParkingSessionRepository;
+import vn.edu.hcmut.bkparking.repository.UserPackageRepository;
 import vn.edu.hcmut.bkparking.repository.UserRepository;
 import vn.edu.hcmut.bkparking.repository.VehicleRepository;
 
@@ -28,6 +27,7 @@ public class VehicleService {
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
     private final ParkingSessionRepository parkingSessionRepository;
+    private final UserPackageRepository userPackageRepository;
 
     @Value("${app.vehicle.max-per-user:2}")
     private int maxVehiclesPerUser;
@@ -35,10 +35,12 @@ public class VehicleService {
     public VehicleService(
             VehicleRepository vehicleRepository,
             UserRepository userRepository,
-            ParkingSessionRepository parkingSessionRepository) {
+            ParkingSessionRepository parkingSessionRepository,
+            UserPackageRepository userPackageRepository) {
         this.vehicleRepository = vehicleRepository;
         this.userRepository = userRepository;
         this.parkingSessionRepository = parkingSessionRepository;
+        this.userPackageRepository = userPackageRepository;
     }
 
     // =========================================================================
@@ -94,6 +96,45 @@ public class VehicleService {
 
         Vehicle saved = vehicleRepository.save(vehicle);
         return mapToUserDto(saved);
+    }
+
+    /**
+     * [User] Mở mã QR gắn với phương tiện đã được duyệt
+     */
+    @Transactional(readOnly = true)
+    public VehicleQrResponseDto getVehicleQr(Long currentUserId, String roleCode, Long vehicleId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                        "Không tìm thấy phương tiện ID: " + vehicleId));
+
+        boolean isOwner = vehicle.getUser().getId().equals(currentUserId);
+        boolean isAdminOrStaff = roleCode != null && !"ROLE_USER".equals(roleCode);
+        if (!isOwner && !isAdminOrStaff) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+
+        if (!"APPROVED".equalsIgnoreCase(vehicle.getStatus())) {
+            throw new BusinessException(ErrorCode.VEHICLE_NOT_APPROVED,
+                    "Phương tiện chưa được duyệt (trạng thái hiện tại: " + vehicle.getStatus()
+                            + ") nên chưa thể sử dụng mã QR");
+        }
+
+        List<UserPackage> activePackages = userPackageRepository.findByUserIdAndStatus(vehicle.getUser().getId(),
+                "ACTIVE");
+        Optional<ParkingSession> activeSession = parkingSessionRepository.findByVehicleIdAndStatus(vehicle.getId(),
+                "ACTIVE");
+
+        return new VehicleQrResponseDto(
+                vehicle.getId(),
+                vehicle.getLicensePlate(),
+                vehicle.getVehicleType(),
+                vehicle.getUser().getFullName(),
+                vehicle.getUser().getCode(),
+                vehicle.getQrToken(),
+                !activePackages.isEmpty(),
+                activeSession.isPresent(),
+                activeSession.map(s -> s.getParkingLot().getName()).orElse(null)
+        );
     }
 
     // =========================================================================

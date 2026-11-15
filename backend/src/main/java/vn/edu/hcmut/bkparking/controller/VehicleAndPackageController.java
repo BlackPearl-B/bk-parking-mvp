@@ -6,19 +6,10 @@ import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.hcmut.bkparking.common.dto.ApiResponse;
-import vn.edu.hcmut.bkparking.common.exception.BusinessException;
-import vn.edu.hcmut.bkparking.common.exception.ErrorCode;
-import vn.edu.hcmut.bkparking.dto.AdminVehicleResponseDto;
-import vn.edu.hcmut.bkparking.dto.CreateVehicleRequest;
-import vn.edu.hcmut.bkparking.dto.RejectVehicleRequest;
-import vn.edu.hcmut.bkparking.dto.UserVehicleResponseDto;
-import vn.edu.hcmut.bkparking.entity.ParkingSession;
+import vn.edu.hcmut.bkparking.dto.*;
 import vn.edu.hcmut.bkparking.entity.UserPackage;
-import vn.edu.hcmut.bkparking.entity.Vehicle;
 import vn.edu.hcmut.bkparking.repository.ParkingPackageRepository;
-import vn.edu.hcmut.bkparking.repository.ParkingSessionRepository;
 import vn.edu.hcmut.bkparking.repository.UserPackageRepository;
-import vn.edu.hcmut.bkparking.repository.VehicleRepository;
 import vn.edu.hcmut.bkparking.security.UserPrincipal;
 import vn.edu.hcmut.bkparking.service.VehicleService;
 
@@ -33,22 +24,16 @@ import java.util.stream.Collectors;
 public class VehicleAndPackageController {
 
     private final VehicleService vehicleService;
-    private final VehicleRepository vehicleRepository;
     private final ParkingPackageRepository parkingPackageRepository;
     private final UserPackageRepository userPackageRepository;
-    private final ParkingSessionRepository parkingSessionRepository;
 
     public VehicleAndPackageController(
             VehicleService vehicleService,
-            VehicleRepository vehicleRepository,
             ParkingPackageRepository parkingPackageRepository,
-            UserPackageRepository userPackageRepository,
-            ParkingSessionRepository parkingSessionRepository) {
+            UserPackageRepository userPackageRepository) {
         this.vehicleService = vehicleService;
-        this.vehicleRepository = vehicleRepository;
         this.parkingPackageRepository = parkingPackageRepository;
         this.userPackageRepository = userPackageRepository;
-        this.parkingSessionRepository = parkingSessionRepository;
     }
 
     // =========================================================================
@@ -112,41 +97,11 @@ public class VehicleAndPackageController {
 
     @GetMapping("/api/v1/vehicles/{id}/qr")
     @Operation(summary = "[User] Mở mã QR gắn với phương tiện đã được duyệt")
-    public ApiResponse<Map<String, Object>> getVehicleQr(
+    public ApiResponse<VehicleQrResponseDto> getVehicleQr(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id) {
-        Vehicle vehicle = vehicleRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
-                        "Không tìm thấy phương tiện ID: " + id));
-
-        boolean isOwner = vehicle.getUser().getId().equals(principal.getId());
-        boolean isAdminOrStaff = !"ROLE_USER".equals(principal.getRoleCode());
-        if (!isOwner && !isAdminOrStaff) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
-
-        if (!"APPROVED".equalsIgnoreCase(vehicle.getStatus())) {
-            throw new BusinessException(ErrorCode.VEHICLE_NOT_APPROVED,
-                    "Phương tiện chưa được duyệt (trạng thái hiện tại: " + vehicle.getStatus()
-                            + ") nên chưa thể sử dụng mã QR");
-        }
-
-        List<UserPackage> activePackages = userPackageRepository.findByUserIdAndStatus(vehicle.getUser().getId(),
-                "ACTIVE");
-        Optional<ParkingSession> activeSession = parkingSessionRepository.findByVehicleIdAndStatus(vehicle.getId(),
-                "ACTIVE");
-
-        Map<String, Object> qrData = new LinkedHashMap<>();
-        qrData.put("vehicleId", vehicle.getId());
-        qrData.put("licensePlate", vehicle.getLicensePlate());
-        qrData.put("vehicleType", vehicle.getVehicleType());
-        qrData.put("ownerName", vehicle.getUser().getFullName());
-        qrData.put("ownerCode", vehicle.getUser().getCode());
-        qrData.put("qrToken", vehicle.getQrToken());
-        qrData.put("packageEligible", !activePackages.isEmpty());
-        qrData.put("currentlyInParkingLot", activeSession.isPresent());
-        qrData.put("currentParkingLot", activeSession.map(s -> s.getParkingLot().getName()).orElse(null));
-        return ApiResponse.ok(qrData);
+        VehicleQrResponseDto qr = vehicleService.getVehicleQr(principal.getId(), principal.getRoleCode(), id);
+        return ApiResponse.ok(qr);
     }
 
     // =========================================================================
