@@ -11,6 +11,7 @@ import vn.edu.hcmut.bkparking.common.exception.ErrorCode;
 import vn.edu.hcmut.bkparking.dto.CheckInRequest;
 import vn.edu.hcmut.bkparking.dto.CheckOutRequest;
 import vn.edu.hcmut.bkparking.dto.ParkingSessionResponseDto;
+import vn.edu.hcmut.bkparking.dto.StaffVehicleSearchResultDto;
 import vn.edu.hcmut.bkparking.entity.*;
 import vn.edu.hcmut.bkparking.repository.*;
 import vn.edu.hcmut.bkparking.security.UserPrincipal;
@@ -130,32 +131,12 @@ public class StaffAndSessionController {
 
     @GetMapping("/api/v1/staff/vehicles/search")
     @Operation(summary = "[Staff] Tra cứu phương tiện theo biển số / MSSV / họ tên / mã QR")
-    public ApiResponse<List<Map<String, Object>>> searchVehicles(@RequestParam(defaultValue = "") String keyword) {
-        List<Vehicle> vehicles = keyword.isBlank()
-                ? vehicleRepository.findAll()
-                : vehicleRepository.searchVehicles(keyword.trim());
-
-        List<Map<String, Object>> list = vehicles.stream().map(v -> {
-            Optional<ParkingSession> activeSession = parkingSessionRepository.findByVehicleIdAndStatus(v.getId(), "ACTIVE");
-            List<UserPackage> activePackages = userPackageRepository.findByUserIdAndStatus(v.getUser().getId(), "ACTIVE");
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("vehicleId", v.getId());
-            m.put("licensePlate", v.getLicensePlate());
-            m.put("vehicleType", v.getVehicleType());
-            m.put("brand", v.getBrand());
-            m.put("model", v.getModel());
-            m.put("color", v.getColor());
-            m.put("status", v.getStatus());
-            m.put("qrToken", v.getQrToken());
-            m.put("ownerName", v.getUser().getFullName());
-            m.put("ownerCode", v.getUser().getCode());
-            m.put("ownerPhone", v.getUser().getPhone());
-            m.put("packageEligible", !activePackages.isEmpty());
-            m.put("currentlyParked", activeSession.isPresent());
-            m.put("activeSession", activeSession.map(ParkingSessionResponseDto::fromEntity).orElse(null));
-            return m;
-        }).collect(Collectors.toList());
-        return ApiResponse.ok(list);
+    public ApiResponse<List<StaffVehicleSearchResultDto>> searchVehicles(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String query) {
+        String term = keyword != null && !keyword.isBlank() ? keyword : query;
+        List<StaffVehicleSearchResultDto> list = parkingSessionService.searchVehicles(term);
+        return ApiResponse.ok("Kết quả tra cứu phương tiện", list);
     }
 
     @GetMapping("/api/v1/staff/sessions/active")
@@ -167,15 +148,17 @@ public class StaffAndSessionController {
 
     @GetMapping("/api/v1/staff/sessions/history")
     @Operation(summary = "[Staff] Lịch sử toàn bộ lượt xe ra/vào bãi")
-    public ApiResponse<List<ParkingSessionResponseDto>> getAllSessionHistory() {
-        List<ParkingSessionResponseDto> list = parkingSessionService.getAllSessionHistory();
+    public ApiResponse<List<ParkingSessionResponseDto>> getAllSessionHistory(@RequestParam(required = false) Long parkingLotId) {
+        List<ParkingSessionResponseDto> list = parkingSessionService.getAllSessionHistory(parkingLotId);
         return ApiResponse.ok(list);
     }
 
     @GetMapping("/api/v1/sessions/my-history")
     @Operation(summary = "[User] Lịch sử gửi xe ra/vào của tôi")
-    public ApiResponse<List<ParkingSessionResponseDto>> getMySessionHistory(@AuthenticationPrincipal UserPrincipal principal) {
-        List<ParkingSessionResponseDto> list = parkingSessionService.getMySessionHistory(principal.getId());
+    public ApiResponse<List<ParkingSessionResponseDto>> getMySessionHistory(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) Long vehicleId) {
+        List<ParkingSessionResponseDto> list = parkingSessionService.getMySessionHistory(principal.getId(), vehicleId);
         return ApiResponse.ok(list);
     }
 

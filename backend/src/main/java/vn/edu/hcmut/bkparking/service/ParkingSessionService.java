@@ -7,6 +7,7 @@ import vn.edu.hcmut.bkparking.common.exception.ErrorCode;
 import vn.edu.hcmut.bkparking.dto.CheckInRequest;
 import vn.edu.hcmut.bkparking.dto.CheckOutRequest;
 import vn.edu.hcmut.bkparking.dto.ParkingSessionResponseDto;
+import vn.edu.hcmut.bkparking.dto.StaffVehicleSearchResultDto;
 import vn.edu.hcmut.bkparking.entity.*;
 import vn.edu.hcmut.bkparking.repository.*;
 
@@ -131,7 +132,26 @@ public class ParkingSessionService {
     }
 
     /**
-     * Tra cứu danh sách các phiên gửi xe đang ACTIVE trong bãi
+     * [Staff] Tra cứu danh sách phương tiện theo từ khóa (Biển số / MSSV / Họ tên / Mã QR)
+     */
+    @Transactional(readOnly = true)
+    public List<StaffVehicleSearchResultDto> searchVehicles(String keyword) {
+        List<Vehicle> vehicles = (keyword == null || keyword.isBlank())
+                ? vehicleRepository.findAll()
+                : vehicleRepository.searchVehicles(keyword.trim());
+
+        return vehicles.stream().map(v -> {
+            Optional<ParkingSession> activeSession = parkingSessionRepository.findByVehicleIdAndStatus(v.getId(), "ACTIVE");
+            List<UserPackage> activePackages = userPackageRepository.findByUserIdAndStatus(v.getUser().getId(), "ACTIVE");
+            boolean hasPackage = !activePackages.isEmpty();
+            boolean isParked = activeSession.isPresent();
+            ParkingSessionResponseDto sessionDto = activeSession.map(ParkingSessionResponseDto::fromEntity).orElse(null);
+            return StaffVehicleSearchResultDto.from(v, hasPackage, isParked, sessionDto);
+        }).collect(Collectors.toList());
+    }
+
+    /**
+     * Tra cứu danh sách các phiên gửi xe đang ACTIVE trong bãi (lọc theo parkingLotId nếu có)
      */
     @Transactional(readOnly = true)
     public List<ParkingSessionResponseDto> getActiveSessions(Long parkingLotId) {
@@ -142,25 +162,25 @@ public class ParkingSessionService {
     }
 
     /**
-     * Tra cứu toàn bộ lịch sử lượt gửi xe toàn hệ thống
+     * Tra cứu toàn bộ lịch sử lượt gửi xe toàn hệ thống (hỗ trợ lọc theo bãi)
      */
     @Transactional(readOnly = true)
-    public List<ParkingSessionResponseDto> getAllSessionHistory() {
-        return parkingSessionRepository.findAllByOrderByCheckinTimeDesc()
-                .stream()
-                .map(ParkingSessionResponseDto::fromEntity)
-                .collect(Collectors.toList());
+    public List<ParkingSessionResponseDto> getAllSessionHistory(Long parkingLotId) {
+        List<ParkingSession> sessions = parkingLotId != null
+                ? parkingSessionRepository.findByParkingLotIdOrderByCheckinTimeDesc(parkingLotId)
+                : parkingSessionRepository.findAllByOrderByCheckinTimeDesc();
+        return sessions.stream().map(ParkingSessionResponseDto::fromEntity).collect(Collectors.toList());
     }
 
     /**
-     * Tra cứu lịch sử gửi xe của người dùng hiện tại
+     * Tra cứu lịch sử gửi xe của người dùng hiện tại (hỗ trợ lọc theo xe)
      */
     @Transactional(readOnly = true)
-    public List<ParkingSessionResponseDto> getMySessionHistory(Long userId) {
-        return parkingSessionRepository.findByVehicleUserIdOrderByCheckinTimeDesc(userId)
-                .stream()
-                .map(ParkingSessionResponseDto::fromEntity)
-                .collect(Collectors.toList());
+    public List<ParkingSessionResponseDto> getMySessionHistory(Long userId, Long vehicleId) {
+        List<ParkingSession> sessions = vehicleId != null
+                ? parkingSessionRepository.findByVehicleUserIdAndVehicleIdOrderByCheckinTimeDesc(userId, vehicleId)
+                : parkingSessionRepository.findByVehicleUserIdOrderByCheckinTimeDesc(userId);
+        return sessions.stream().map(ParkingSessionResponseDto::fromEntity).collect(Collectors.toList());
     }
 
     /**

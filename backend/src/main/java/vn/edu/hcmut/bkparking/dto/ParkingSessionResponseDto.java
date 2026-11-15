@@ -92,4 +92,22 @@ public class ParkingSessionResponseDto {
 
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+
+    // Compatibility getters for Frontend / API Contract
+    public Long getId() { return sessionId; }
+    public String getCheckInTime() { return checkinTime; }
+    public String getCheckOutTime() { return checkoutTime; }
+    public String getCheckInGate() { return entryGate; }
+    public String getCheckOutGate() { return exitGate; }
+
+    public Long getDurationMinutes() {
+        if (checkinTime != null && checkoutTime != null) {
+            try {
+                java.time.LocalDateTime in = java.time.LocalDateTime.parse(checkinTime);
+                java.time.LocalDateTime out = java.time.LocalDateTime.parse(checkoutTime);
+                return java.time.Duration.between(in, out).toMinutes();
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
 }

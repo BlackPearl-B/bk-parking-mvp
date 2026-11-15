@@ -322,4 +322,69 @@ class VehicleControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("INVALID_QR_TOKEN"));
     }
+
+    // -------------------------------------------------------------------------
+    // 4. TRA CỨU XE, XE ĐANG TRONG BÃI VÀ LỊCH SỬ RA/VÀO (ISSUE CRITERIA)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void testStaffSearchVehicles_ByKeywordAndQuery() throws Exception {
+        String staffToken = loginAndGetToken("staff.gate", "123456");
+
+        // 1. Search by license plate
+        mockMvc.perform(get("/api/v1/staff/vehicles/search?keyword=59X3")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].licensePlate").value("59X3-682.45"))
+                .andExpect(jsonPath("$.data[0].ownerName").value("Nguyễn Văn An"));
+
+        // 2. Search by student code via `query` param
+        mockMvc.perform(get("/api/v1/staff/vehicles/search?query=2311770")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].ownerCode").value("2311770"));
+    }
+
+    @Test
+    void testStaffGetActiveSessions_Success() throws Exception {
+        String staffToken = loginAndGetToken("staff.gate", "123456");
+
+        // 1. Get all active sessions
+        mockMvc.perform(get("/api/v1/staff/sessions/active")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
+
+        // 2. Filter active sessions by parking lot
+        mockMvc.perform(get("/api/v1/staff/sessions/active?parkingLotId=1")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    void testStaffGetAllSessionHistory_Success() throws Exception {
+        String staffToken = loginAndGetToken("staff.gate", "123456");
+
+        mockMvc.perform(get("/api/v1/staff/sessions/history")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    void testUserGetMySessionHistory_Success() throws Exception {
+        String userToken = loginAndGetToken("sv.nguyen", "123456");
+
+        mockMvc.perform(get("/api/v1/sessions/my-history")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
+    }
 }

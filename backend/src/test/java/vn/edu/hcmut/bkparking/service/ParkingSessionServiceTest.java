@@ -236,4 +236,99 @@ class ParkingSessionServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_QR_TOKEN);
     }
+
+    // -------------------------------------------------------------------------
+    // 3. SEARCH & HISTORY TESTS (TIÊU CHÍ: SEARCH, ACTIVE SESSIONS, HISTORY)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void testSearchVehicles_WithKeyword() {
+        when(vehicleRepository.searchVehicles("59T2")).thenReturn(List.of(mockApprovedVehicle));
+        when(parkingSessionRepository.findByVehicleIdAndStatus(10L, "ACTIVE")).thenReturn(Optional.empty());
+        when(userPackageRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(List.of(new UserPackage()));
+
+        List<vn.edu.hcmut.bkparking.dto.StaffVehicleSearchResultDto> list = parkingSessionService.searchVehicles("59T2");
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getLicensePlate()).isEqualTo("59T2-119.88");
+        assertThat(list.get(0).getOwnerName()).isEqualTo("Nguyễn Văn An");
+        assertThat(list.get(0).isPackageEligible()).isTrue();
+        assertThat(list.get(0).isCurrentlyParked()).isFalse();
+
+        verify(vehicleRepository, times(1)).searchVehicles("59T2");
+    }
+
+    @Test
+    void testSearchVehicles_BlankKeyword_CallsFindAll() {
+        when(vehicleRepository.findAll()).thenReturn(List.of(mockApprovedVehicle));
+        when(parkingSessionRepository.findByVehicleIdAndStatus(10L, "ACTIVE")).thenReturn(Optional.empty());
+        when(userPackageRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(List.of());
+
+        List<vn.edu.hcmut.bkparking.dto.StaffVehicleSearchResultDto> list = parkingSessionService.searchVehicles("");
+
+        assertThat(list).hasSize(1);
+        verify(vehicleRepository, times(1)).findAll();
+        verify(vehicleRepository, never()).searchVehicles(any());
+    }
+
+    @Test
+    void testGetActiveSessions_ByLotAndAll() {
+        ParkingSession s = new ParkingSession();
+        s.setId(101L);
+        s.setVehicle(mockApprovedVehicle);
+        s.setParkingLot(mockLot);
+        s.setStatus("ACTIVE");
+
+        when(parkingSessionRepository.findByParkingLotIdAndStatusOrderByCheckinTimeDesc(1L, "ACTIVE"))
+                .thenReturn(List.of(s));
+        when(parkingSessionRepository.findByStatusOrderByCheckinTimeDesc("ACTIVE"))
+                .thenReturn(List.of(s));
+
+        List<ParkingSessionResponseDto> byLot = parkingSessionService.getActiveSessions(1L);
+        assertThat(byLot).hasSize(1);
+        assertThat(byLot.get(0).getSessionId()).isEqualTo(101L);
+
+        List<ParkingSessionResponseDto> all = parkingSessionService.getActiveSessions(null);
+        assertThat(all).hasSize(1);
+    }
+
+    @Test
+    void testGetAllSessionHistory_ByLotAndAll() {
+        ParkingSession s = new ParkingSession();
+        s.setId(102L);
+        s.setVehicle(mockApprovedVehicle);
+        s.setParkingLot(mockLot);
+        s.setStatus("COMPLETED");
+
+        when(parkingSessionRepository.findByParkingLotIdOrderByCheckinTimeDesc(1L))
+                .thenReturn(List.of(s));
+        when(parkingSessionRepository.findAllByOrderByCheckinTimeDesc())
+                .thenReturn(List.of(s));
+
+        List<ParkingSessionResponseDto> byLot = parkingSessionService.getAllSessionHistory(1L);
+        assertThat(byLot).hasSize(1);
+
+        List<ParkingSessionResponseDto> all = parkingSessionService.getAllSessionHistory(null);
+        assertThat(all).hasSize(1);
+    }
+
+    @Test
+    void testGetMySessionHistory_ByVehicleAndAll() {
+        ParkingSession s = new ParkingSession();
+        s.setId(103L);
+        s.setVehicle(mockApprovedVehicle);
+        s.setParkingLot(mockLot);
+        s.setStatus("COMPLETED");
+
+        when(parkingSessionRepository.findByVehicleUserIdAndVehicleIdOrderByCheckinTimeDesc(1L, 10L))
+                .thenReturn(List.of(s));
+        when(parkingSessionRepository.findByVehicleUserIdOrderByCheckinTimeDesc(1L))
+                .thenReturn(List.of(s));
+
+        List<ParkingSessionResponseDto> byVehicle = parkingSessionService.getMySessionHistory(1L, 10L);
+        assertThat(byVehicle).hasSize(1);
+
+        List<ParkingSessionResponseDto> allMy = parkingSessionService.getMySessionHistory(1L, null);
+        assertThat(allMy).hasSize(1);
+    }
 }
