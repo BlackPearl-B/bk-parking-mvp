@@ -13,6 +13,8 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
     List<ParkingSession> findByStatusOrderByCheckinTimeDesc(String status);
     List<ParkingSession> findByParkingLotIdAndStatusOrderByCheckinTimeDesc(Long parkingLotId, String status);
     List<ParkingSession> findByVehicleUserIdOrderByCheckinTimeDesc(Long userId);
+    List<ParkingSession> findByVehicleUserIdAndVehicleIdOrderByCheckinTimeDesc(Long userId, Long vehicleId);
+    List<ParkingSession> findByParkingLotIdOrderByCheckinTimeDesc(Long parkingLotId);
     List<ParkingSession> findAllByOrderByCheckinTimeDesc();
 }
 
