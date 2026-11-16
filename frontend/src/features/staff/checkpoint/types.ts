@@ -46,10 +46,3 @@ export interface ShiftSummaryData {
   exceptionCount: number;
 }
 
-export interface AlertItem {
-  id: string;
-  title: string;
-  time: string;
-  priorityNote: string;
-}
-
