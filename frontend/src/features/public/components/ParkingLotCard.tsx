@@ -1,16 +1,17 @@
 import React from 'react';
-import { Car, Bike, Clock } from 'lucide-react';
-import { ParkingLotPublicInfo } from '../api/publicApi';
+import { Bike, Clock } from 'lucide-react';
+import { ParkingLotDto } from '../../../types/api';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
 import { Badge } from '../../../components/ui/Badge';
 
 interface ParkingLotCardProps {
-  lot: ParkingLotPublicInfo;
+  lot: ParkingLotDto;
 }
 
 export const ParkingLotCard: React.FC<ParkingLotCardProps> = ({ lot }) => {
-  const isDanger = lot.occupancyRate >= 90;
+  const isDanger = lot.occupancyRate >= 90 || lot.status === 'FULL';
   const isWarning = lot.occupancyRate >= 70 && lot.occupancyRate < 90;
+  const available = lot.availableSlots ?? Math.max(0, lot.capacity - lot.occupiedCount);
 
   return (
     <div className="bg-surface-card border border-border-default rounded-3xl p-5 flex flex-col justify-between shadow-sm hover:shadow-md transition-all">
@@ -26,7 +27,7 @@ export const ParkingLotCard: React.FC<ParkingLotCardProps> = ({ lot }) => {
         </div>
 
         <div className="flex items-baseline gap-2 mt-2">
-          <span className="text-3xl font-extrabold text-text-primary">còn {lot.availableCount}</span>
+          <span className="text-3xl font-extrabold text-text-primary">còn {available}</span>
           <span className="text-sm font-semibold text-text-secondary">chỗ trống</span>
         </div>
 
@@ -42,15 +43,13 @@ export const ParkingLotCard: React.FC<ParkingLotCardProps> = ({ lot }) => {
 
       <div className="border-t border-border-subtle pt-3 mt-4 flex items-center justify-between text-[11px] text-text-secondary">
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1"><Bike className="w-3.5 h-3.5 text-text-primary" /> Xe máy</span>
-          {lot.isCarAllowed && (
-            <span className="flex items-center gap-1 text-info font-bold">
-              · <Car className="w-3.5 h-3.5" /> Có ô tô
-            </span>
-          )}
+          <span className="flex items-center gap-1">
+            <Bike className="w-3.5 h-3.5 text-text-primary" />
+            {lot.allowedVehicleTypes ? 'Xe máy / Xe điện' : 'Mọi xe'}
+          </span>
         </div>
         <span className="flex items-center gap-1">
-          <Clock className="w-3 h-3" /> Cập nhật: {lot.updatedAt}
+          <Clock className="w-3 h-3" /> Cập nhật: {lot.updatedAt ? lot.updatedAt.slice(11, 19) || lot.updatedAt : 'Vừa xong'}
         </span>
       </div>
     </div>

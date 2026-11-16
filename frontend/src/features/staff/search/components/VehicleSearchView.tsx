@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, ArrowLeft, XCircle } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { UserDetailCard, UserRecord } from './UserDetailCard';
 import { SearchResultItem } from './SearchResultItem';
-import { mockSearchDatabase } from '../mock/searchMockData';
+import { searchApi } from '../api/searchApi';
 
 interface VehicleSearchViewProps {
   onBackToCheckpoint: () => void;
@@ -12,9 +12,6 @@ interface VehicleSearchViewProps {
 
 type SearchMode = 'list' | 'detail';
 
-// Tìm theo MSSV hoặc biển số (không phân biệt hoa thường, bỏ dấu gạch ngang)
-const normalize = (s: string) => s.toLowerCase().replace(/[-.\s]/g, '');
-
 export const VehicleSearchView: React.FC<VehicleSearchViewProps> = ({
   onBackToCheckpoint,
   onGoToException,
@@ -22,16 +19,17 @@ export const VehicleSearchView: React.FC<VehicleSearchViewProps> = ({
   const [keyword, setKeyword] = useState('');
   const [mode, setMode] = useState<SearchMode>('list');
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
+  const [searchResults, setSearchResults] = useState<UserRecord[]>([]);
 
   const trimmed = keyword.trim();
-  const searchResults =
-    trimmed.length >= 2
-      ? mockSearchDatabase.filter(
-          (u) =>
-            normalize(u.code).includes(normalize(trimmed)) ||
-            normalize(u.plate).includes(normalize(trimmed))
-        )
-      : [];
+
+  useEffect(() => {
+    if (trimmed.length >= 2) {
+      searchApi.searchVehicles(trimmed).then(setSearchResults);
+    } else {
+      setSearchResults([]);
+    }
+  }, [trimmed]);
 
   const handleViewDetail = (user: UserRecord) => {
     setSelectedUser(user);
@@ -45,7 +43,6 @@ export const VehicleSearchView: React.FC<VehicleSearchViewProps> = ({
 
   return (
     <main className="flex-1 p-3 flex flex-col gap-3 overflow-hidden">
-      {/* Thanh tìm kiếm – luôn hiện */}
       <section className="bg-surface-card border border-border-muted rounded-2xl p-4 flex flex-col gap-2 shrink-0 shadow-sm">
         <div className="flex items-center justify-between">
           {mode === 'detail' && selectedUser ? (
@@ -69,7 +66,7 @@ export const VehicleSearchView: React.FC<VehicleSearchViewProps> = ({
               type="text"
               value={keyword}
               onChange={(e) => { setKeyword(e.target.value); setMode('list'); setSelectedUser(null); }}
-              placeholder="Ví dụ: 2011876 hoặc 59X3-456.78"
+              placeholder="Ví dụ: 2311770 hoặc 59X3-682.45"
               className="bg-transparent text-text-primary text-base font-bold w-full focus:outline-none"
             />
           </div>
@@ -83,7 +80,7 @@ export const VehicleSearchView: React.FC<VehicleSearchViewProps> = ({
         {mode === 'list' && !keyword && (
           <div className="flex items-center gap-1.5 pt-0.5 text-xs text-text-secondary">
             <span>Gợi ý:</span>
-            {['2011876', '59X3-456.78', '51A-123.45'].map((val) => (
+            {['2311770', '59X3-682.45', '51A-123.45'].map((val) => (
               <button
                 key={val}
                 type="button"
@@ -97,10 +94,8 @@ export const VehicleSearchView: React.FC<VehicleSearchViewProps> = ({
         )}
       </section>
 
-      {/* NỘI DUNG CHÍNH */}
       {mode === 'list' ? (
         <section className="flex-1 overflow-y-auto flex flex-col gap-2">
-          {/* Chưa nhập */}
           {trimmed.length < 2 && (
             <div className="flex-1 flex flex-col items-center justify-center gap-2 text-text-secondary">
               <Search className="w-10 h-10 opacity-30" />
@@ -109,14 +104,12 @@ export const VehicleSearchView: React.FC<VehicleSearchViewProps> = ({
             </div>
           )}
 
-          {/* Có kết quả */}
           {trimmed.length >= 2 && searchResults.length > 0 &&
             searchResults.map((u) => (
               <SearchResultItem key={u.id} user={u} onViewDetail={handleViewDetail} />
             ))
           }
 
-          {/* Không tìm thấy */}
           {trimmed.length >= 2 && searchResults.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center gap-2 text-text-secondary">
               <XCircle className="w-10 h-10 opacity-30" />
@@ -129,7 +122,6 @@ export const VehicleSearchView: React.FC<VehicleSearchViewProps> = ({
         selectedUser && <UserDetailCard user={selectedUser} />
       )}
 
-      {/* Chân trang */}
       <footer className="h-actionbar bg-surface-card border border-border-muted rounded-2xl px-4 flex items-center justify-between shrink-0 shadow-sm">
         <div className="flex items-center gap-3">
           <Button variant="subtle" onClick={onBackToCheckpoint}>Về Trạm kiểm soát</Button>

@@ -3,12 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Lock, User, ShieldCheck, ArrowRight, Loader2, Monitor } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useAuth } from '../context/AuthContext';
-import { authApi, DemoAccount } from '../api/authApi';
+import { authApi } from '../api/authApi';
+import { DemoAccountItem } from '../../../types/api';
 
 export const LoginView: React.FC = () => {
-  const [username, setUsername] = useState('baove01');
-  const [password, setPassword] = useState('password');
-  const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([]);
+  const [username, setUsername] = useState('staff.gate');
+  const [password, setPassword] = useState('123456');
+  const [demoAccounts, setDemoAccounts] = useState<DemoAccountItem[]>([]);
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -16,9 +17,10 @@ export const LoginView: React.FC = () => {
     authApi.getDemoAccounts().then(setDemoAccounts);
   }, []);
 
-  const handleLogin = async (targetUser?: string) => {
+  const handleLogin = async (targetUser?: string, targetPass?: string) => {
     const userToLogin = targetUser || username;
-    const user = await login(userToLogin, password);
+    const passToLogin = targetPass || password;
+    const user = await login(userToLogin, passToLogin);
     if (user.role === 'ROLE_STAFF') navigate('/staff');
     else if (user.role === 'ROLE_ADMIN') navigate('/admin');
     else navigate('/user');
@@ -71,22 +73,22 @@ export const LoginView: React.FC = () => {
           {/* Chọn tài khoản Demo nhanh */}
           <div className="border-t border-border-subtle pt-3 flex flex-col gap-2">
             <span className="text-xs font-bold text-text-secondary flex items-center gap-1">
-              <ShieldCheck className="w-4 h-4 text-info" /> Chọn nhanh tài khoản Demo (1 chạm):
+              <ShieldCheck className="w-4 h-4 text-info" /> Tài khoản Demo 1 chạm (Mật khẩu: 123456):
             </span>
             <div className="flex flex-col gap-1.5">
               {demoAccounts.map((acc) => (
                 <button
                   key={acc.username}
                   type="button"
-                  onClick={() => { setUsername(acc.username); handleLogin(acc.username); }}
+                  onClick={() => { setUsername(acc.username); setPassword(acc.passwordHint || '123456'); handleLogin(acc.username, acc.passwordHint || '123456'); }}
                   className="p-2.5 rounded-xl border border-border-default bg-surface-subtle hover:bg-surface-hover text-left flex items-center justify-between text-xs"
                 >
                   <div>
                     <span className="font-bold text-text-primary">{acc.fullName}</span>
-                    <div className="text-[11px] text-text-secondary mt-0.5">{acc.description}</div>
+                    <div className="text-[11px] text-text-secondary mt-0.5">{acc.username} · {acc.roleName}</div>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-card border border-border-default text-info">
-                    {acc.role.replace('ROLE_', '')}
+                    {acc.portalTarget.replace('_PORTAL', '')}
                   </span>
                 </button>
               ))}

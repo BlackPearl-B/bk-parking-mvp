@@ -1,3 +1,5 @@
+import { apiClient } from '../../../../api/client';
+import { ApiResponse, VerifyQrResponse, ParkingSessionDto } from '../../../../types/api';
 import { ScanResult, Direction } from '../types';
 
 export interface VerifyOptions {
@@ -5,73 +7,58 @@ export interface VerifyOptions {
   isOffline?: boolean;
 }
 
-// Cơ sở dữ liệu xe đăng ký thực tế tại cổng
-const registeredVehicles = [
-  {
-    plate: '59X3-456.78',
-    ownerId: '2011876',
-    ownerName: 'Trần Quốc Bảo',
-    ownerRole: 'Sinh viên (SV)',
-    vehicleInfo: 'Xe máy · Honda Vision 110 · Đen',
-    allowedLots: 'Bãi A, B',
-  },
-  {
-    plate: '59P1-123.45',
-    ownerId: '2112345',
-    ownerName: 'Trần Minh Anh',
-    ownerRole: 'Sinh viên (SV)',
-    vehicleInfo: 'Xe máy · Honda AirBlade · Đỏ',
-    allowedLots: 'Bãi A, B',
-  },
-  {
-    plate: '51A-123.45',
-    ownerId: 'GV-0421',
-    ownerName: 'Nguyễn Thị Hoa',
-    ownerRole: 'Giảng viên (GV)',
-    vehicleInfo: 'Ô tô · Toyota Vios · Trắng',
-    allowedLots: 'Bãi A, E',
-  },
-  {
-    plate: '59C1-246.80',
-    ownerId: 'NV-0278',
-    ownerName: 'Hoàng Gia Phúc',
-    ownerRole: 'Nhân viên (NV)',
-    vehicleInfo: 'Xe máy · Honda AirBlade · Đỏ',
-    allowedLots: 'Bãi A, B',
-    isLocked: true,
-  },
+const mockVehicles = [
+  { plate: '59X3-682.45', ownerId: '2311770', ownerName: 'Nguyễn Văn An', vehicleInfo: 'Honda AirBlade 125 · Đen Bạc' },
+  { plate: '59P1-123.45', ownerId: '2112345', ownerName: 'Trần Minh Anh', vehicleInfo: 'Honda Vision 110 · Đỏ' },
+  { plate: '51A-123.45', ownerId: 'GV-0421', ownerName: 'Nguyễn Thị Hoa', vehicleInfo: 'Toyota Vios · Trắng' },
 ];
-
-// Lưu trạng thái xe đang trong bãi để tự động nhận diện hướng VÀO/RA
-const vehiclesInLot = new Set<string>(['59X3-456.78', '51A-123.45']);
 
 export const scanApi = {
   verifyPass: async ({ rawCode, isOffline = false }: VerifyOptions): Promise<ScanResult> => {
-    await new Promise((r) => setTimeout(r, 450));
-    const clean = rawCode.trim().toUpperCase().replace(/[-.\s]/g, '');
+    if (!isOffline) {
+      try {
+        const res = await apiClient.post<ApiResponse<VerifyQrResponse>>('/staff/qr/verify', {
+          qrOrPlate: rawCode.trim(),
+        });
+        const d = res.data.data;
+        const dir: Direction = d.recommendedAction === 'CHECK_OUT' ? 'out' : 'in';
+        return {
+          state: d.valid ? 'valid' : 'invalid',
+          direction: dir,
+          plateNumber: d.licensePlate,
+          cameraPlate: d.licensePlate,
+          cameraConfidence: 98,
+          isPlateMatched: true,
+          vehicleInfo: `${d.brand || 'Xe'} ${d.model || ''} · ${d.color || ''}`.trim(),
+          ownerName: d.ownerName,
+          ownerRole: d.ownerCode.startsWith('GV') ? 'Giảng viên' : 'Sinh viên',
+          ownerId: d.ownerCode,
+          allowedLots: d.packageName || 'Bãi A1',
+          invalidReason: !d.valid ? d.statusMessage : undefined,
+          checkInTime: d.activeSession?.checkinTime ? d.activeSession.checkinTime.slice(11, 19) : undefined,
+        };
+      } catch {
+        // Fallback sang local simulation khi backend offline
+      }
+    }
 
-    // Tìm trong danh mục xe
-    const found = registeredVehicles.find(
-      (v) =>
-        v.plate.toUpperCase().replace(/[-.\s]/g, '').includes(clean) ||
-        v.ownerId.toUpperCase().includes(clean) ||
-        clean.includes(v.ownerId.toUpperCase())
-    );
+    const clean = rawCode.trim().toUpperCase().replace(/[-.\s]/g, '');
+    const found = mockVehicles.find((v) => v.plate.replace(/[-.\s]/g, '').includes(clean) || v.ownerId.includes(clean));
 
     if (isOffline) {
       const plate = found ? found.plate : rawCode.toUpperCase();
       return {
         state: 'manual',
-        direction: vehiclesInLot.has(plate) ? 'out' : 'in',
+        direction: 'in',
         plateNumber: plate,
         cameraPlate: `${plate} (Chưa đối chiếu)`,
         cameraConfidence: 0,
         isPlateMatched: false,
-        vehicleInfo: found?.vehicleInfo || 'Xe máy · Cần đối chiếu ảnh',
+        vehicleInfo: found?.vehicleInfo || 'Cần đối chiếu ảnh camera',
         ownerName: found?.ownerName || 'Hồ sơ ngoại tuyến',
-        ownerRole: found?.ownerRole || 'Sinh viên (SV)',
+        ownerRole: 'Sinh viên (SV)',
         ownerId: found?.ownerId || rawCode,
-        allowedLots: 'Bãi A',
+        allowedLots: 'Nhà xe Khu A1',
         isOffline: true,
       };
     }
@@ -93,53 +80,51 @@ export const scanApi = {
       };
     }
 
-    if (found.isLocked) {
-      return {
-        state: 'invalid',
-        direction: 'in',
-        plateNumber: found.plate,
-        cameraPlate: found.plate,
-        cameraConfidence: 99,
-        isPlateMatched: true,
-        vehicleInfo: found.vehicleInfo,
-        ownerName: found.ownerName,
-        ownerRole: found.ownerRole,
-        ownerId: found.ownerId,
-        allowedLots: found.allowedLots,
-        invalidReason: 'Gói đỗ xe đã hết hạn hoặc tài khoản bị khóa.',
-      };
-    }
-
-    // Tự động nhận diện hướng VÀO hoặc RA
-    const currentlyIn = vehiclesInLot.has(found.plate);
-    const direction: Direction = currentlyIn ? 'out' : 'in';
-
-    // Cập nhật trạng thái bãi
-    if (direction === 'in') {
-      vehiclesInLot.add(found.plate);
-    } else {
-      vehiclesInLot.delete(found.plate);
-    }
-
     return {
       state: 'valid',
-      direction,
+      direction: 'in',
       plateNumber: found.plate,
       cameraPlate: found.plate,
-      cameraConfidence: 98,
+      cameraConfidence: 99,
       isPlateMatched: true,
       vehicleInfo: found.vehicleInfo,
       ownerName: found.ownerName,
-      ownerRole: found.ownerRole,
+      ownerRole: 'Sinh viên (SV)',
       ownerId: found.ownerId,
-      allowedLots: found.allowedLots,
-      checkInTime: direction === 'out' ? 'Hôm nay 07:15:20' : undefined,
-      parkingDuration: direction === 'out' ? '1 giờ 45 phút' : undefined,
+      allowedLots: 'Nhà xe Khu A1 (Cổng Lý Thường Kiệt)',
     };
   },
 
-  confirmAction: async (_action: 'allow' | 'reject' | 'exception', _plate: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 200));
+  checkIn: async (qrOrPlate: string, parkingLotId = 1): Promise<ParkingSessionDto | null> => {
+    try {
+      const res = await apiClient.post<ApiResponse<ParkingSessionDto>>('/staff/sessions/check-in', {
+        qrOrPlate,
+        parkingLotId,
+        entryGate: 'Cổng A1 - Làn 1',
+      });
+      return res.data.data;
+    } catch {
+      return null;
+    }
+  },
+
+  checkOut: async (qrOrPlate: string): Promise<ParkingSessionDto | null> => {
+    try {
+      const res = await apiClient.post<ApiResponse<ParkingSessionDto>>('/staff/sessions/check-out', {
+        qrOrPlate,
+        exitGate: 'Cổng A1 - Làn 2',
+      });
+      return res.data.data;
+    } catch {
+      return null;
+    }
+  },
+
+  confirmAction: async (action: 'allow' | 'reject' | 'exception', plate: string, dir: Direction = 'in'): Promise<boolean> => {
+    if (action === 'allow') {
+      if (dir === 'in') await scanApi.checkIn(plate);
+      else await scanApi.checkOut(plate);
+    }
     return true;
   },
 };

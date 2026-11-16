@@ -1,96 +1,100 @@
-import axios from 'axios';
+import { apiClient } from '../../../api/client';
+import { ApiResponse, PublicParkingLotsResponse, ParkingLotDto } from '../../../types/api';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
-
-export interface ParkingLotPublicInfo {
-  id: number;
-  code: string;
-  name: string;
-  location: string;
-  capacity: number;
-  occupiedCount: number;
-  availableCount: number;
-  occupancyRate: number;
-  status: 'ACTIVE' | 'MAINTENANCE' | 'FULL';
-  updatedAt: string;
-  isCarAllowed?: boolean;
-}
-
-const mockPublicLots: ParkingLotPublicInfo[] = [
+const mockLots: ParkingLotDto[] = [
   {
     id: 1,
-    code: 'LOT_A',
-    name: 'Bãi A – Cổng Lý Thường Kiệt',
-    location: 'Cơ sở 1 (268 Lý Thường Kiệt)',
-    capacity: 1800,
-    occupiedCount: 1692,
-    availableCount: 108,
+    code: 'LOT_A1',
+    name: 'Nhà xe Khu A1 (Cổng Lý Thường Kiệt)',
+    campus: 'CS1_LTK',
+    location: 'Cổng số 1 - 268 Lý Thường Kiệt, Q.10',
+    allowedVehicleTypes: 'MOTORBIKE,ELECTRIC_BIKE,BICYCLE',
+    capacity: 200,
+    occupiedCount: 188,
+    availableSlots: 12,
     occupancyRate: 94.0,
-    status: 'ACTIVE',
-    updatedAt: '07:45:12',
-    isCarAllowed: true,
+    status: 'OPEN',
+    updatedAt: '2026-11-16T12:00:00',
   },
   {
     id: 2,
-    code: 'LOT_B',
-    name: 'Bãi B – Nhà A1–A5',
+    code: 'LOT_B1',
+    name: 'Bãi B1 – Khu A1–A5',
+    campus: 'CS1_LTK',
     location: 'Cơ sở 1 (Khu A)',
-    capacity: 1200,
-    occupiedCount: 1056,
-    availableCount: 144,
+    allowedVehicleTypes: 'MOTORBIKE,ELECTRIC_BIKE',
+    capacity: 150,
+    occupiedCount: 132,
+    availableSlots: 18,
     occupancyRate: 88.0,
-    status: 'ACTIVE',
-    updatedAt: '07:44:50',
-    isCarAllowed: false,
+    status: 'OPEN',
+    updatedAt: '2026-11-16T11:58:00',
   },
   {
     id: 3,
-    code: 'LOT_C',
-    name: 'Bãi C – Nhà B1–B4',
+    code: 'LOT_C1',
+    name: 'Bãi C1 – Khu B1–B4',
+    campus: 'CS1_LTK',
     location: 'Cơ sở 1 (Khu B)',
-    capacity: 900,
-    occupiedCount: 648,
-    availableCount: 252,
-    occupancyRate: 72.0,
-    status: 'ACTIVE',
-    updatedAt: '07:44:10',
-    isCarAllowed: true,
+    allowedVehicleTypes: 'MOTORBIKE,ELECTRIC_BIKE,BICYCLE',
+    capacity: 120,
+    occupiedCount: 86,
+    availableSlots: 34,
+    occupancyRate: 71.7,
+    status: 'OPEN',
+    updatedAt: '2026-11-16T11:55:00',
   },
   {
     id: 4,
-    code: 'LOT_D',
+    code: 'LOT_D_KTX',
     name: 'Bãi D – Ký túc xá',
-    location: 'Khu nội trú KTX',
-    capacity: 600,
-    occupiedCount: 330,
-    availableCount: 270,
+    campus: 'KTX',
+    location: '497 Hòa Hảo, Q.10',
+    allowedVehicleTypes: 'MOTORBIKE,BICYCLE',
+    capacity: 100,
+    occupiedCount: 55,
+    availableSlots: 45,
     occupancyRate: 55.0,
-    status: 'ACTIVE',
-    updatedAt: '07:43:20',
-    isCarAllowed: false,
+    status: 'OPEN',
+    updatedAt: '2026-11-16T11:50:00',
   },
   {
     id: 5,
-    code: 'LOT_E',
-    name: 'Bãi E – Hành chính & Giảng viên',
-    location: 'Cơ sở 1 (Nhà A4)',
-    capacity: 300,
-    occupiedCount: 273,
-    availableCount: 27,
-    occupancyRate: 91.0,
-    status: 'ACTIVE',
-    updatedAt: '07:45:00',
-    isCarAllowed: true,
+    code: 'LOT_E_ADMIN',
+    name: 'Bãi E – Khu Hiệu bộ & Giảng viên',
+    campus: 'CS1_LTK',
+    location: 'Nhà A4 - Cơ sở 1',
+    allowedVehicleTypes: 'MOTORBIKE,ELECTRIC_BIKE',
+    capacity: 50,
+    occupiedCount: 46,
+    availableSlots: 4,
+    occupancyRate: 92.0,
+    status: 'OPEN',
+    updatedAt: '2026-11-16T12:00:00',
   },
 ];
 
 export const publicApi = {
-  getParkingLots: async (): Promise<ParkingLotPublicInfo[]> => {
+  getParkingLots: async (): Promise<ParkingLotDto[]> => {
     try {
-      const res = await axios.get(`${BASE_URL}/public/parking-lots`, { timeout: 1500 });
+      const res = await apiClient.get<ApiResponse<PublicParkingLotsResponse | ParkingLotDto[]>>(
+        '/public/parking-lots'
+      );
+      const data = res.data.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.parkingLots)) return data.parkingLots;
+      return mockLots;
+    } catch {
+      return mockLots;
+    }
+  },
+
+  getParkingLotById: async (id: number): Promise<ParkingLotDto | null> => {
+    try {
+      const res = await apiClient.get<ApiResponse<ParkingLotDto>>(`/public/parking-lots/${id}`);
       return res.data.data;
     } catch {
-      return mockPublicLots;
+      return mockLots.find((l) => l.id === id) || null;
     }
   },
 };

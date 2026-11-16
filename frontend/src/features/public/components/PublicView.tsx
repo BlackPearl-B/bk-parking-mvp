@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw, LogIn, Clock, Monitor } from 'lucide-react';
-import { publicApi, ParkingLotPublicInfo } from '../api/publicApi';
+import { publicApi } from '../api/publicApi';
+import { ParkingLotDto } from '../../../types/api';
 import { ParkingLotCard } from './ParkingLotCard';
 
 export const PublicView: React.FC = () => {
-  const [lots, setLots] = useState<ParkingLotPublicInfo[]>([]);
-  const [filter, setFilter] = useState<'all' | 'car'>('all');
+  const [lots, setLots] = useState<ParkingLotDto[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState('');
 
   const fetchLots = () => {
@@ -22,14 +22,18 @@ export const PublicView: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const filteredLots = lots.filter((l) => (filter === 'car' ? l.isCarAllowed : true));
-  const totalAvailable = lots.reduce((acc, cur) => acc + cur.availableCount, 0);
+  const totalAvailable = lots.reduce(
+    (acc, cur) => acc + (cur.availableSlots ?? Math.max(0, cur.capacity - cur.occupiedCount)),
+    0
+  );
 
   return (
     <div className="min-h-screen w-full bg-surface-app flex flex-col justify-between p-6 select-none">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-surface-inverse text-text-inverse font-bold text-2xl flex items-center justify-center">P</div>
+          <div className="w-11 h-11 rounded-2xl bg-surface-inverse text-text-inverse font-bold text-2xl flex items-center justify-center">
+            P
+          </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-text-primary">Bảng điện tử số chỗ trống bãi đỗ xe</h1>
@@ -54,30 +58,12 @@ export const PublicView: React.FC = () => {
         </div>
       </header>
 
-      {/* Bộ lọc loại xe & danh sách bãi */}
+      {/* Danh sách bãi */}
       <main className="flex-1 my-4 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-text-secondary">Lọc theo:</span>
-            <button
-              type="button"
-              onClick={() => setFilter('all')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                filter === 'all' ? 'bg-surface-inverse text-text-inverse' : 'bg-surface-card text-text-primary border-border-default'
-              }`}
-            >
-              Tất cả 5 bãi xe
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilter('car')}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                filter === 'car' ? 'bg-surface-inverse text-text-inverse' : 'bg-surface-card text-text-primary border-border-default'
-              }`}
-            >
-              Có phân khu Ô tô
-            </button>
-          </div>
+          <span className="text-xs font-bold text-text-secondary">
+            Tình trạng thời gian thực tại các phân khu bãi đỗ xe ({lots.length} bãi)
+          </span>
 
           <button type="button" onClick={fetchLots} className="flex items-center gap-1 text-xs font-semibold text-text-secondary hover:text-text-primary">
             <RefreshCw className="w-3.5 h-3.5" /> Làm mới
@@ -85,7 +71,7 @@ export const PublicView: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          {filteredLots.map((lot) => (
+          {lots.map((lot) => (
             <ParkingLotCard key={lot.id} lot={lot} />
           ))}
         </div>

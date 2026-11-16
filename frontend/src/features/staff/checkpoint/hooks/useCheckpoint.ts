@@ -34,6 +34,7 @@ export const useCheckpoint = () => {
 
       if (result.state === 'valid') {
         const isEntry = result.direction === 'in';
+        scanApi.confirmAction('allow', result.plateNumber, result.direction);
         setRecentEvents((prev) => [
           { id: Date.now().toString(), time: getTime(), plate: result.plateNumber, direction: result.direction, status: 'normal', person: `${result.ownerName} · ${result.ownerRole}`, canUndo: true },
           ...prev.slice(0, 8),

@@ -1,68 +1,92 @@
-import axios from 'axios';
+import { apiClient } from '../../../api/client';
+import { ApiResponse, LoginResponse, DemoAccountItem, UserInfo } from '../../../types/api';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
-
-export interface UserProfile {
-  id: number;
-  username: string;
-  fullName: string;
-  email: string;
-  phoneNumber: string;
-  studentOrStaffId: string;
-  role: 'ROLE_USER' | 'ROLE_ADMIN' | 'ROLE_STAFF';
-}
-
-export interface LoginResponseData {
-  accessToken: string;
-  tokenType: string;
-  expiresIn: number;
-  user: UserProfile;
-}
-
-export interface DemoAccount {
-  username: string;
-  fullName: string;
-  role: 'ROLE_USER' | 'ROLE_ADMIN' | 'ROLE_STAFF';
-  description: string;
-}
-
-const mockDemoAccounts: DemoAccount[] = [
-  { username: 'baove01', fullName: 'Lê Bảo Vệ (Bãi A)', role: 'ROLE_STAFF', description: 'Bảo vệ kiểm soát trạm quét QR vào/ra' },
-  { username: 'sinhvien01', fullName: 'Nguyễn Văn An (SV)', role: 'ROLE_USER', description: 'Sinh viên có gói tháng & xe đã duyệt' },
-  { username: 'admin01', fullName: 'Nguyễn Quản Trị', role: 'ROLE_ADMIN', description: 'Quản trị viên quản lý bãi xe' },
+const mockDemoAccounts: DemoAccountItem[] = [
+  {
+    username: 'staff.gate',
+    passwordHint: '123456',
+    fullName: 'Lê Bảo Vệ (Trạm Bãi A)',
+    code: 'NV001',
+    role: 'ROLE_STAFF',
+    roleName: 'Nhân viên trạm',
+    portalTarget: 'STAFF_PORTAL',
+  },
+  {
+    username: 'sv.nguyen',
+    passwordHint: '123456',
+    fullName: 'Nguyễn Văn An (SV K23)',
+    code: '2311770',
+    role: 'ROLE_USER',
+    roleName: 'Sinh viên',
+    portalTarget: 'USER_PORTAL',
+  },
+  {
+    username: 'admin',
+    passwordHint: '123456',
+    fullName: 'Nguyễn Quản Trị',
+    code: 'AD001',
+    role: 'ROLE_ADMIN',
+    roleName: 'Quản trị viên',
+    portalTarget: 'ADMIN_PORTAL',
+  },
 ];
 
 export const authApi = {
-  login: async (username: string, password?: string): Promise<LoginResponseData> => {
+  login: async (username: string, password?: string): Promise<LoginResponse> => {
     try {
-      const res = await axios.post(`${BASE_URL}/auth/login`, { username, password: password || 'password' }, { timeout: 1500 });
+      const res = await apiClient.post<ApiResponse<LoginResponse>>('/auth/login', {
+        username,
+        password: password || '123456',
+      });
       return res.data.data;
     } catch {
-      await new Promise((r) => setTimeout(r, 350));
+      await new Promise((r) => setTimeout(r, 250));
       const found = mockDemoAccounts.find((a) => a.username === username) || mockDemoAccounts[0];
       return {
         accessToken: `mock-jwt-token-for-${found.username}`,
         tokenType: 'Bearer',
-        expiresIn: 86400,
+        portalTarget: found.portalTarget,
         user: {
-          id: found.username === 'baove01' ? 3 : found.username === 'admin01' ? 2 : 1,
+          id: found.username === 'staff.gate' ? 3 : found.username === 'admin' ? 2 : 1,
           username: found.username,
           fullName: found.fullName,
+          code: found.code,
           email: `${found.username}@hcmut.edu.vn`,
-          phoneNumber: '0901234567',
-          studentOrStaffId: found.username === 'baove01' ? 'NV-012' : found.username === 'admin01' ? 'AD-001' : '2011876',
+          phone: '0901234567',
+          department: found.username === 'staff.gate' ? 'Tổ Bảo vệ Bãi A' : 'Khoa KH&KT Máy tính',
           role: found.role,
+          roleName: found.roleName,
+          status: 'ACTIVE',
+          hasActivePackage: true,
+          activePackage: {
+            packageCode: 'PKG_SEM_261',
+            packageName: 'Gói Học kỳ HK261',
+            startDate: '2026-09-01',
+            endDate: '2026-12-31',
+            status: 'ACTIVE',
+          },
+          registeredVehicleCount: 1,
+          maxVehicleLimit: 2,
         },
       };
     }
   },
 
-  getDemoAccounts: async (): Promise<DemoAccount[]> => {
+  getDemoAccounts: async (): Promise<DemoAccountItem[]> => {
     try {
-      const res = await axios.get(`${BASE_URL}/auth/demo-accounts`, { timeout: 1500 });
+      const res = await apiClient.get<ApiResponse<DemoAccountItem[]>>('/auth/demo-accounts');
       return res.data.data;
     } catch {
       return mockDemoAccounts;
+    }
+  },
+
+  getMe: async (): Promise<UserInfo | null> => {
+    try {
+      const res = await apiClient.get<ApiResponse<UserInfo>>('/auth/me');
+      return res.data.data;
+    } catch {
+      return null;
     }
   },
 };
