@@ -37,9 +37,11 @@ export function UserPortalLayout() {
             onClick={() => setIsMobileMenuOpen(false)}
             to="/user/overview"
           >
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-black text-lg font-bold text-lime-400">
-              P
-            </span>
+            <img
+              alt="Logo BK TP.HCM"
+              className="size-12 shrink-0 object-contain"
+              src="/logobk.png"
+            />
             <span className={`truncate text-sm font-semibold text-slate-900 ${isCollapsed ? 'md:hidden' : ''}`}>
               BK Parking
             </span>
